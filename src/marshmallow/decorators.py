@@ -1,16 +1,6 @@
+# -*- coding: utf-8 -*-
 """Decorators for registering schema pre-processing and post-processing methods.
 These should be imported from the top-level `marshmallow` module.
-
-Methods decorated with
-`pre_load <marshmallow.decorators.pre_load>`, `post_load <marshmallow.decorators.post_load>`,
-`pre_dump <marshmallow.decorators.pre_dump>`, `post_dump <marshmallow.decorators.post_dump>`,
-and `validates_schema <marshmallow.decorators.validates_schema>` receive
-``many`` as a keyword argument. In addition, `pre_load <marshmallow.decorators.pre_load>`,
-`post_load <marshmallow.decorators.post_load>`,
-and `validates_schema <marshmallow.decorators.validates_schema>` receive
-``partial``. If you don't need these arguments, add ``**kwargs`` to your method
-signature.
-
 
 Example: ::
 
@@ -25,27 +15,27 @@ Example: ::
         age = fields.Integer(required=True)
 
         @post_load
-        def lowerstrip_email(self, item, many, **kwargs):
+        def lowerstrip_email(self, item):
             item['email'] = item['email'].lower().strip()
             return item
 
         @pre_load(pass_many=True)
-        def remove_envelope(self, data, many, **kwargs):
+        def remove_envelope(self, data, many):
             namespace = 'results' if many else 'result'
             return data[namespace]
 
         @post_dump(pass_many=True)
-        def add_envelope(self, data, many, **kwargs):
+        def add_envelope(self, data, many):
             namespace = 'results' if many else 'result'
             return {namespace: data}
 
         @validates_schema
-        def validate_email(self, data, **kwargs):
+        def validate_email(self, data):
             if len(data['email']) < 3:
                 raise ValidationError('Email must be more than 3 characters', 'email')
 
         @validates('age')
-        def validate_age(self, data, **kwargs):
+        def validate_age(self, data):
             if data < 14:
                 raise ValidationError('Too young!')
 
@@ -58,18 +48,20 @@ Example: ::
     If you need to guarantee order of different processing steps, you should put
     them in the same processing method.
 """
+from __future__ import unicode_literals
+
 import functools
 
 
-PRE_DUMP = "pre_dump"
-POST_DUMP = "post_dump"
-PRE_LOAD = "pre_load"
-POST_LOAD = "post_load"
-VALIDATES = "validates"
-VALIDATES_SCHEMA = "validates_schema"
+PRE_DUMP = 'pre_dump'
+POST_DUMP = 'post_dump'
+PRE_LOAD = 'pre_load'
+POST_LOAD = 'post_load'
+VALIDATES = 'validates'
+VALIDATES_SCHEMA = 'validates_schema'
 
 
-def validates(field_name: str):
+def validates(field_name):
     """Register a field validator.
 
     :param str field_name: Name of the field that the method validates.
@@ -78,13 +70,16 @@ def validates(field_name: str):
 
 
 def validates_schema(
-    fn=None, pass_many=False, pass_original=False, skip_on_field_errors=True
+    fn=None,
+    pass_many=False,
+    pass_original=False,
+    skip_on_field_errors=True,
 ):
     """Register a schema-level validator.
 
-    By default it receives a single object at a time, transparently handling the ``many``
-    argument passed to the `Schema`'s :func:`~marshmallow.Schema.validate` call.
-    If ``pass_many=True``, the raw data (which may be a collection) is passed.
+    By default, receives a single object at a time, regardless of whether ``many=True``
+    is passed to the `Schema`. If ``pass_many=True``, the raw data (which may be a collection)
+    and the value for ``many`` is passed.
 
     If ``pass_original=True``, the original data (before unmarshalling) will be passed as
     an additional argument to the method.
@@ -94,10 +89,6 @@ def validates_schema(
 
     .. versionchanged:: 3.0.0b1
         ``skip_on_field_errors`` defaults to `True`.
-
-    .. versionchanged:: 3.0.0
-        ``partial`` and ``many`` are always passed as keyword arguments to
-        the decorated method.
     """
     return set_hook(
         fn,
@@ -111,12 +102,9 @@ def pre_dump(fn=None, pass_many=False):
     """Register a method to invoke before serializing an object. The method
     receives the object to be serialized and returns the processed object.
 
-    By default it receives a single object at a time, transparently handling the ``many``
-    argument passed to the `Schema`'s :func:`~marshmallow.Schema.dump` call.
-    If ``pass_many=True``, the raw data (which may be a collection) is passed.
-
-    .. versionchanged:: 3.0.0
-        ``many`` is always passed as a keyword arguments to the decorated method.
+    By default, receives a single object at a time, regardless of whether ``many=True``
+    is passed to the `Schema`. If ``pass_many=True``, the raw data (which may be a collection)
+    and the value for ``many`` is passed.
     """
     return set_hook(fn, (PRE_DUMP, pass_many))
 
@@ -125,15 +113,12 @@ def post_dump(fn=None, pass_many=False, pass_original=False):
     """Register a method to invoke after serializing an object. The method
     receives the serialized object and returns the processed object.
 
-    By default it receives a single object at a time, transparently handling the ``many``
-    argument passed to the `Schema`'s :func:`~marshmallow.Schema.dump` call.
-    If ``pass_many=True``, the raw data (which may be a collection) is passed.
+    By default, receives a single object at a time, transparently handling the ``many``
+    argument passed to the Schema. If ``pass_many=True``, the raw data
+    (which may be a collection) and the value for ``many`` is passed.
 
     If ``pass_original=True``, the original data (before serializing) will be passed as
     an additional argument to the method.
-
-    .. versionchanged:: 3.0.0
-        ``many`` is always passed as a keyword arguments to the decorated method.
     """
     return set_hook(fn, (POST_DUMP, pass_many), pass_original=pass_original)
 
@@ -142,13 +127,9 @@ def pre_load(fn=None, pass_many=False):
     """Register a method to invoke before deserializing an object. The method
     receives the data to be deserialized and returns the processed data.
 
-    By default it receives a single object at a time, transparently handling the ``many``
-    argument passed to the `Schema`'s :func:`~marshmallow.Schema.load` call.
-    If ``pass_many=True``, the raw data (which may be a collection) is passed.
-
-    .. versionchanged:: 3.0.0
-        ``partial`` and ``many`` are always passed as keyword arguments to
-        the decorated method.
+    By default, receives a single datum at a time, transparently handling the ``many``
+    argument passed to the Schema. If ``pass_many=True``, the raw data
+    (which may be a collection) and the value for ``many`` is passed.
     """
     return set_hook(fn, (PRE_LOAD, pass_many))
 
@@ -157,23 +138,18 @@ def post_load(fn=None, pass_many=False, pass_original=False):
     """Register a method to invoke after deserializing an object. The method
     receives the deserialized data and returns the processed data.
 
-    By default it receives a single object at a time, transparently handling the ``many``
-    argument passed to the `Schema`'s :func:`~marshmallow.Schema.load` call.
-    If ``pass_many=True``, the raw data (which may be a collection) is passed.
+    By default, receives a single datum at a time, transparently handling the ``many``
+    argument passed to the Schema. If ``pass_many=True``, the raw data
+    (which may be a collection) and the value for ``many`` is passed.
 
     If ``pass_original=True``, the original data (before deserializing) will be passed as
     an additional argument to the method.
-
-    .. versionchanged:: 3.0.0
-        ``partial`` and ``many`` are always passed as keyword arguments to
-        the decorated method.
     """
     return set_hook(fn, (POST_LOAD, pass_many), pass_original=pass_original)
 
 
 def set_hook(fn, key, **kwargs):
     """Mark decorated function as a hook to be picked up later.
-    You should not need to use this method directly.
 
     .. note::
         Currently only works with functions and instance methods. Class and
@@ -186,14 +162,14 @@ def set_hook(fn, key, **kwargs):
     if fn is None:
         return functools.partial(set_hook, key=key, **kwargs)
 
-    # Set a __marshmallow_hook__ attribute instead of wrapping in some class,
+    # Set a marshmallow_tags attribute instead of wrapping in some class,
     # because I still want this to end up as a normal (unbound) method.
     try:
         hook_config = fn.__marshmallow_hook__
     except AttributeError:
         fn.__marshmallow_hook__ = hook_config = {}
     # Also save the kwargs for the tagged function on
-    # __marshmallow_hook__, keyed by (<tag>, <pass_many>)
+    # __marshmallow_tags__, keyed by (<tag>, <pass_many>)
     hook_config[key] = kwargs
 
     return fn
